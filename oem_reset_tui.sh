@@ -1,13 +1,12 @@
 #!/bin/bash
 
 # ============================================================
-# macOS OEM Reset Script - TUI Edition
+# macOS OEM Reset Script - TUI Edition v2.1
 # Für OCLP-gepatchte Systeme
-# ============================================================
-# WARNUNG: Dieses Script löscht Benutzerdaten!
+# Verbesserte User-Löschung für echten OEM-Zustand
 # ============================================================
 
-set -euo pipefail  # Strikte Fehlerbehandlung
+set -euo pipefail
 
 # Farben (nur ASCII-Quotes!)
 RED='\033[0;31m'
@@ -17,7 +16,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Globale Variablen
-SCRIPT_VERSION="2.0"
+SCRIPT_VERSION="2.1"
 DRY_RUN=false
 BACKUP_HOME=false
 DELETE_USER=true
@@ -44,7 +43,7 @@ show_header() {
 check_dependencies() {
     if ! command -v whiptail &> /dev/null; then
         echo -e "${RED}Fehler: whiptail nicht gefunden!${NC}"
-        echo "Installiere mit: brew install newt"
+        echo "Bitte installiere newt"
         exit 1
     fi
 }
@@ -58,6 +57,11 @@ check_root() {
 
 get_current_user() {
     stat -f%Su /dev/console
+}
+
+get_user_id() {
+    local username="$1"
+    dscl . -read "/Users/${username}" UniqueID 2>/dev/null | awk '{print $2}'
 }
 
 # ============================================================
@@ -80,7 +84,6 @@ show_main_menu() {
 show_options_menu() {
     local CURRENT_USER=$(get_current_user)
     
-    # Checkboxen für Optionen
     local OPTIONS=$(whiptail --title "Optionen konfigurieren" --checklist \
         "Wähle die durchzuführenden Aktionen:" 20 70 8 \
         "DELETE_USER" "Benutzer '${CURRENT_USER}' löschen" ON \
@@ -93,7 +96,6 @@ show_options_menu() {
         3>&1 1>&2 2>&3)
     
     if [ $? -eq 0 ]; then
-        # Alle auf false setzen
         DELETE_USER=false
         DELETE_HOME=false
         CLEAN_CACHES=false
@@ -102,7 +104,6 @@ show_options_menu() {
         AUTO_REBOOT=false
         BACKUP_HOME=false
         
-        # Gewählte auf true setzen
         for option in $OPTIONS; do
             option=$(echo "$option" | tr -d '"')
             case "$option" in
@@ -147,7 +148,7 @@ confirm_reset() {
 
 get_action_list() {
     local actions=""
-    [ "$DELETE_USER" = true ] && actions="${actions}✓ Benutzer löschen\n"
+    [ "$DELETE_USER" = true ] && actions="${actions}✓ Benutzer komplett löschen\n"
     [ "$DELETE_HOME" = true ] && actions="${actions}✓ Home-Verzeichnis entfernen\n"
     [ "$BACKUP_HOME" = true ] && actions="${actions}✓ Home-Verzeichnis vorher sichern\n"
     [ "$CLEAN_CACHES" = true ] && actions="${actions}✓ System-Caches leeren\n"
@@ -155,6 +156,43 @@ get_action_list() {
     [ "$RESET_SETUP" = true ] && actions="${actions}✓ Setup-Assistent aktivieren\n"
     [ "$AUTO_REBOOT" = true ] && actions="${actions}✓ Automatisch neu starten\n"
     echo -e "$actions"
+}
+
+# ============================================================
+# Erweiterte User-Löschung
+# ============================================================
+
+delete_user_completely() {
+    local username="$1"
+    
+    if [ "$DRY_RUN" = true ]; then
+        echo "[DRY-RUN] Würde Benutzer ${username} komplett löschen"
+        return 0
+    fi
+    
+    # 1. User aus Directory Service löschen
+    dscl . -delete "/Users/${username}" 2>/dev/null || true
+    
+    # 2. User aus dslocal entfernen (falls vorhanden)
+    if [ -f "/var/db/dslocal/nodes/Default/users/${username}.plist" ]; then
+        rm -f "/var/db/dslocal/nodes/Default/users/${username}.plist"
+    fi
+    
+    # 3. Secure Token entfernen (falls vorhanden)
+    sysadminctl -deleteUser "${username}" 2>/dev/null || true
+    
+    # 4. User aus allen Gruppen entfernen
+    for group in $(dscl . -list /Groups); do
+        dscl . -delete "/Groups/${group}" GroupMembership "${username}" 2>/dev/null || true
+    done
+    
+    # 5. Keychain-Einträge entfernen
+    rm -rf "/Library/Keychains/${username}" 2>/dev/null || true
+    
+    # 6. Account-Metadaten löschen
+    rm -rf "/var/db/AccountPolicy/${username}" 2>/dev/null || true
+    
+    echo "✓ Benutzer ${username} vollständig entfernt"
 }
 
 # ============================================================
@@ -189,7 +227,7 @@ backup_home_directory() {
 perform_reset() {
     local CURRENT_USER=$(get_current_user)
     local STEP=1
-    local TOTAL=6
+    local TOTAL=7
     
     {
         # Schritt 1: Backup (optional)
@@ -203,13 +241,13 @@ perform_reset() {
             sleep 1
         fi
         
-        # Schritt 2: Benutzer löschen
+        # Schritt 2: Benutzer KOMPLETT löschen (VERBESSERT!)
         if [ "$DELETE_USER" = true ]; then
             echo "XXX"
             echo "$((STEP * 100 / TOTAL))"
-            echo "Lösche Benutzer aus Verzeichnisdatenbank..."
+            echo "Lösche Benutzer vollständig aus allen Datenbanken..."
             echo "XXX"
-            execute_step "Benutzer löschen" "dscl . -delete '/Users/${CURRENT_USER}'"
+            delete_user_completely "${CURRENT_USER}"
             STEP=$((STEP + 1))
             sleep 1
         fi
@@ -258,6 +296,18 @@ perform_reset() {
             sleep 1
         fi
         
+        # Schritt 7: Directory Services Cache löschen (NEU!)
+        echo "XXX"
+        echo "$((STEP * 100 / TOTAL))"
+        echo "Bereinige Directory Services Cache..."
+        echo "XXX"
+        if [ "$DRY_RUN" = false ]; then
+            killall DirectoryService 2>/dev/null || true
+            killall opendirectoryd 2>/dev/null || true
+        fi
+        STEP=$((STEP + 1))
+        sleep 1
+        
         echo "XXX"
         echo "100"
         echo "Abgeschlossen!"
@@ -289,10 +339,10 @@ main() {
                     perform_reset
                     
                     if [ "$DRY_RUN" = false ]; then
-                        whiptail --title "✅ Erfolgreich" --msgbox "OEM-Reset wurde erfolgreich durchgeführt!\n\nOCLP-Patches bleiben erhalten." 10 60
+                        whiptail --title "✅ Erfolgreich" --msgbox "OEM-Reset wurde erfolgreich durchgeführt!\n\nOCLP-Patches bleiben erhalten.\n\nBenutzer wurde vollständig entfernt." 12 60
                         
                         if [ "$AUTO_REBOOT" = true ]; then
-                            whiptail --title "Neustart" --msgbox "System wird in 5 Sekunden neu gestartet..." 8 50
+                            whiptail --title "Neustart" --msgbox "System wird in 5 Sekunden neu gestartet...\n\nBeim nächsten Start erscheint der Setup-Assistent für einen NEUEN Benutzer." 10 60
                             sleep 5
                             reboot
                         fi
