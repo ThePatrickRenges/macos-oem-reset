@@ -27,15 +27,38 @@ Dieses Script ermöglicht es, ein macOS-System nach einem Upgrade und der Konfig
 - ✅ **OCLP-kompatibel** - Root-Patches bleiben erhalten
 - 🎨 **Farbige Ausgabe** für bessere Übersicht
 
+## 📸 Screenshots
+
+### System-Informationen
+Das Script zeigt detaillierte Informationen über das aktuelle System an:
+
+![System-Info](screenshots/unnamed.png)
+
+### Hauptmenü
+Übersichtliches Menü mit allen verfügbaren Optionen:
+
+![Hauptmenü](screenshots/unnamed%20(1).png)
+
+### Optionen konfigurieren
+Wähle individuell, welche Aktionen durchgeführt werden sollen:
+
+![Optionen](screenshots/unnamed%20(2).png)
+
+### Bestätigung
+Letzte Sicherheitsabfrage vor der Ausführung:
+
+![Bestätigung](screenshots/unnamed%20(3).png)
+
 ## 🚀 Was macht das Script?
 
 ### Optionale Aktionen (individuell konfigurierbar):
 
-- ✓ Löscht temporäre Benutzer-Accounts aus der Verzeichnisdatenbank
+- ✓ **Löscht Benutzer vollständig** aus allen Systemdatenbanken (dscl, dslocal, Secure Token, Gruppen, Keychain)
 - ✓ Entfernt Home-Verzeichnisse (mit optionalem Backup)
 - ✓ Leert System-Caches (`/Library/Caches`, `/System/Library/Caches`)
 - ✓ Bereinigt System-Logs (`/var/log`, `/Library/Logs`)
 - ✓ Reaktiviert den macOS Setup-Assistenten
+- ✓ Bereinigt Directory Services Cache
 - ✓ Optional: Automatischer Neustart
 
 ### Was bleibt erhalten:
@@ -57,7 +80,7 @@ Dieses Script ermöglicht es, ein macOS-System nach einem Upgrade und der Konfig
 
 ```bash
 # Repository klonen
-git clone https://github.com/ThePatrickRenges/macos-oem-reset.git
+git clone https://github.com/DEIN-USERNAME/macos-oem-reset.git
 cd macos-oem-reset
 
 # Script ausführbar machen
@@ -99,19 +122,25 @@ Das Script führt alle konfigurierten Aktionen aus und startet (optional) neu.
 
 ### Beispiel: MacBook Pro Retina 13" (Late 2013)
 
+**⚠️ WICHTIG: Verwende eine frische Installation, kein Upgrade!**
+
 ```
-1. ✅ Ausgangssystem: Big Sur mit temporärem Admin-User
-2. ✅ OCLP: macOS 15.7 (Sequoia) Upgrade durchführen
-3. ✅ Boot in das neue System
-4. ✅ OCLP: Post-Install Root Patches anwenden
-5. ✅ System testen (GPU-Beschleunigung, WiFi, etc.)
-6. ✅ OCLP Settings: ShowPicker deaktivieren
-7. ✅ OCLP: OpenCore neu bauen und installieren
+1. ✅ macOS Sequoia 15.7 CLEAN INSTALL durchführen (nicht Upgrade!)
+2. ✅ Temporären Admin-User anlegen (z.B. "setup")
+3. ✅ OCLP: Post-Install Root Patches anwenden
+4. ✅ System testen (GPU-Beschleunigung, WiFi, etc.)
+5. ✅ OCLP Settings: ShowPicker deaktivieren
+6. ✅ OCLP: OpenCore neu bauen und installieren
+7. ✅ Alle gewünschten Apps systemweit installieren
 8. ✅ Dry-Run: sudo ./oem_reset_tui.sh (Menü: 3)
 9. ✅ Live-Ausführung: sudo ./oem_reset_tui.sh (Menü: 2)
-10. ✅ Nach Reboot: Setup-Assistent erscheint
+10. ✅ Nach Reboot: Setup-Assistent für NEUEN Benutzer erscheint
 11. ✅ Fertiges OEM-System!
 ```
+
+### Warum Clean Install statt Upgrade?
+
+Bei einem Upgrade (Big Sur → Sequoia) zeigt macOS den "Upgrade-Setup-Assistenten", der bestehende User erwartet. Bei einer Clean Installation erscheint der echte "Neuer Mac"-Setup-Assistent, der nach einem komplett neuen Benutzer fragt - genau was wir für ein OEM-System wollen!
 
 ## 🖥️ TUI-Navigation
 
@@ -164,6 +193,18 @@ Prüfe, ob `.AppleSetupDone` wirklich gelöscht wurde:
 ls -la /var/db/.AppleSetupDone
 # Sollte nicht existieren
 ```
+
+### Upgrade-Setup statt "Neuer Mac"-Setup
+
+**Problem:** Nach dem Script erscheint der Upgrade-Assistent statt des echten Setup-Assistenten.
+
+**Lösung:** Stelle sicher, dass du eine **Clean Installation** von macOS durchgeführt hast, nicht ein Upgrade von einer älteren Version. Das Script funktioniert am besten mit frischen Installationen.
+
+### Benutzer erscheint nach Reboot wieder
+
+**Problem:** Der gelöschte Benutzer ist nach dem Neustart wieder da.
+
+**Lösung:** Script v2.1 oder neuer verwenden! Ältere Versionen löschen den Benutzer nicht vollständig. Die neue Version entfernt User aus allen Systemdatenbanken (dscl, dslocal, Secure Token, etc.).
 
 ## 🤝 Beitragen
 
