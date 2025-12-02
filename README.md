@@ -57,7 +57,7 @@ Dieses Script ermöglicht es, ein macOS-System nach einem Upgrade und der Konfig
 
 ```bash
 # Repository klonen
-git clone https://github.com/DEIN-USERNAME/macos-oem-reset.git
+git clone https://github.com/ThePatrickRenges/macos-oem-reset.git
 cd macos-oem-reset
 
 # Script ausführbar machen
