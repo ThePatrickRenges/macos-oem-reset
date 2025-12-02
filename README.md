@@ -80,7 +80,7 @@ Letzte Sicherheitsabfrage vor der Ausführung:
 
 ```bash
 # Repository klonen
-git clone https://github.com/DEIN-USERNAME/macos-oem-reset.git
+git clone https://github.com/ThePatrickRenges/macos-oem-reset.git
 cd macos-oem-reset
 
 # Script ausführbar machen
